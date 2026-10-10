@@ -1,14 +1,17 @@
 import { useState } from "react";
 import CourseCard from "../components/CourseCard.jsx";
-import { courses } from "../data/courses.js";
+import Status from "../components/Status.jsx";
+import useFetch from "../hooks/useFetch.js";
+import { getCourses } from "../services/api.js";
 
 const levels = ["All", "Beginner", "Intermediate"];
 
 export default function Courses() {
+  const { data: courses, loading, error } = useFetch(getCourses);
   const [level, setLevel] = useState("All");
   const [query, setQuery] = useState("");
 
-  const visible = courses.filter(
+  const visible = (courses || []).filter(
     (c) =>
       (level === "All" || c.level === level) &&
       c.title.toLowerCase().includes(query.trim().toLowerCase())
@@ -34,9 +37,11 @@ export default function Courses() {
         </div>
       </div>
 
-      {visible.length === 0 ? (
+      <Status loading={loading} error={error} />
+      {courses && visible.length === 0 && (
         <p className="empty">No courses match. Try a different search or level.</p>
-      ) : (
+      )}
+      {courses && visible.length > 0 && (
         <div className="grid">
           {visible.map((c) => <CourseCard key={c.id} course={c} />)}
         </div>

@@ -84,3 +84,6 @@ input { font: inherit; padding: .6rem .8rem; border: 1px solid var(--line); bord
   .nav-links.open { display: flex; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.status { padding: 1.2rem; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); }
+.status-error { border-color: #b3261e; color: #b3261e; }

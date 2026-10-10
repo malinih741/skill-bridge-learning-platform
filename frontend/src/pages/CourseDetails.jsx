@@ -1,16 +1,26 @@
 import { Link, useParams } from "react-router-dom";
-import { courses } from "../data/courses.js";
+import Status from "../components/Status.jsx";
+import useFetch from "../hooks/useFetch.js";
+import { getCourse } from "../services/api.js";
 
 export default function CourseDetails() {
   const { id } = useParams();
-  const course = courses.find((c) => c.id === Number(id));
+  const { data: course, loading, error } = useFetch(() => getCourse(id), [id]);
 
-  if (!course) {
+  if (error && error.status === 404) {
     return (
       <section className="container section">
         <h1>Course not found</h1>
         <p>This course doesn't exist or isn't published yet.</p>
         <Link to="/courses" className="btn">Back to courses</Link>
+      </section>
+    );
+  }
+
+  if (loading || error) {
+    return (
+      <section className="container section">
+        <Status loading={loading} error={error} />
       </section>
     );
   }
@@ -27,7 +37,12 @@ export default function CourseDetails() {
         {course.outcomes.map((o) => <li key={o}>{o}</li>)}
       </ul>
 
-      {/* Week 4: replace with real enrolment (POST /api/courses/{id}/enroll/) */}
+      <h2>Lessons</h2>
+      <ol className="outcomes">
+        {course.lesson_list.map((l) => <li key={l.id}>{l.title}</li>)}
+      </ol>
+
+      {/* Next: replace with real enrolment (POST /api/courses/{id}/enroll/) */}
       <Link to="/login" className="btn">Log in to enrol</Link>
     </section>
   );

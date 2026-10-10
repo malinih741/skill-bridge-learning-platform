@@ -1,4 +1,4 @@
-// All backend calls go through here (Week 4).
+// All backend calls go through here.
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 export async function request(path, options = {}) {
@@ -7,8 +7,10 @@ export async function request(path, options = {}) {
     ...options,
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `Request failed (${response.status})`);
+    const body = await response.json().catch(() => ({}));
+    const error = new Error(body.detail || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }

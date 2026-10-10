@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import CourseCard from "../components/CourseCard.jsx";
-import { courses } from "../data/courses.js";
+import Status from "../components/Status.jsx";
+import useFetch from "../hooks/useFetch.js";
+import { getCourses } from "../services/api.js";
 
 const steps = [
   { title: "Enrol", text: "Pick a course that matches your level." },
@@ -10,6 +12,8 @@ const steps = [
 ];
 
 export default function Home() {
+  const { data: courses, loading, error } = useFetch(getCourses);
+
   return (
     <>
       <section className="hero">
@@ -37,9 +41,12 @@ export default function Home() {
 
       <section className="container section">
         <h2>Start with a beginner course</h2>
-        <div className="grid">
-          {courses.slice(0, 3).map((c) => <CourseCard key={c.id} course={c} />)}
-        </div>
+        <Status loading={loading} error={error} />
+        {courses && (
+          <div className="grid">
+            {courses.slice(0, 3).map((c) => <CourseCard key={c.id} course={c} />)}
+          </div>
+        )}
       </section>
     </>
   );
