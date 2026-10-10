@@ -133,3 +133,53 @@ class QuizAttempt(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.quiz} - {self.score}%"
+
+
+class ProjectSubmission(models.Model):
+    class Status(models.TextChoices):
+        SUBMITTED = "submitted", "Submitted (waiting for review)"
+        APPROVED = "approved", "Approved"
+        CHANGES_REQUESTED = "changes_requested", "Changes requested"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="project_submissions", on_delete=models.CASCADE
+    )
+    course = models.ForeignKey(Course, related_name="project_submissions", on_delete=models.CASCADE)
+    repo_url = models.URLField(max_length=300)
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SUBMITTED)
+    feedback = models.TextField(blank=True)
+    submitted_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        related_name="reviewed_projects", on_delete=models.SET_NULL,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "course"], name="one_project_per_user_course")
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.course} ({self.status})"
+
+
+class Certificate(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="certificates", on_delete=models.CASCADE
+    )
+    course = models.ForeignKey(Course, related_name="certificates", on_delete=models.CASCADE)
+    certificate_number = models.CharField(max_length=30, unique=True, editable=False)
+    recipient_name = models.CharField(max_length=150, help_text="Name printed on the certificate")
+    issued_at = models.DateTimeField(auto_now_add=True)
+    revoked = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-issued_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "course"], name="one_certificate_per_user_course")
+        ]
+
+    def __str__(self):
+        return f"{self.certificate_number} - {self.recipient_name}"

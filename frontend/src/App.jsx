@@ -9,6 +9,8 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Learn from "./pages/Learn.jsx";
+import Verify from "./pages/Verify.jsx";
+import VerifyCertificate from "./pages/VerifyCertificate.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
 export default function App() {
@@ -24,6 +26,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/verify/:number" element={<VerifyCertificate />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

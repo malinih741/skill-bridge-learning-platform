@@ -159,3 +159,171 @@ class LearningTests(APITestCase):
         self.login_as(self.outsider)
         url = reverse("quiz-submit", args=[self.quiz.id])
         self.assertEqual(self.client.post(url, {"answers": {}}, format="json").status_code, 403)
+
+
+from .models import Certificate, ProjectSubmission  # noqa: E402
+from .services import issue_certificate_if_eligible  # noqa: E402
+
+
+class CertificateTests(APITestCase):
+    def setUp(self):
+        self.course = Course.objects.create(title="Python", description="d", published=True)
+        self.lesson = Lesson.objects.create(course=self.course, title="One", content="x", sequence_number=1)
+        self.quiz = Quiz.objects.create(course=self.course, title="Quiz", pass_mark=60)
+        self.question = Question.objects.create(
+            quiz=self.quiz, question_text="Q", options=["a", "b"], correct_answer=0, order=1
+        )
+        self.asha = User.objects.create_user(
+            "asha@example.com", "asha@example.com", "Str0ng-Pass-2026", first_name="Asha Kumar"
+        )
+        self.outsider = User.objects.create_user("lee@example.com", "lee@example.com", "Str0ng-Pass-2026")
+        Enrollment.objects.create(user=self.asha, course=self.course)
+
+    def login_as(self, user):
+        token, _ = Token.objects.get_or_create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+    def finish_lesson(self):
+        return self.client.post(reverse("lesson-complete", args=[self.lesson.id]))
+
+    def take_quiz(self, answer):
+        return self.client.post(
+            reverse("quiz-submit", args=[self.quiz.id]),
+            {"answers": {str(self.question.id): answer}},
+            format="json",
+        )
+
+    def submit_project(self, url="https://github.com/asha/project"):
+        return self.client.post(
+            reverse("course-project", args=[self.course.id]),
+            {"repo_url": url, "notes": "done"},
+            format="json",
+        )
+
+    def approve_project(self):
+        ProjectSubmission.objects.filter(user=self.asha, course=self.course).update(
+            status=ProjectSubmission.Status.APPROVED
+        )
+        return issue_certificate_if_eligible(self.asha, self.course)
+
+    # --- project submission ---
+    def test_project_needs_enrolment(self):
+        self.login_as(self.outsider)
+        self.assertEqual(self.submit_project().status_code, 403)
+
+    def test_project_link_must_be_http_or_https(self):
+        self.login_as(self.asha)
+        self.assertEqual(self.submit_project("javascript:alert(1)").status_code, 400)
+        self.assertEqual(self.submit_project("not a url").status_code, 400)
+
+    def test_resubmit_after_changes_requested_then_locked_when_approved(self):
+        self.login_as(self.asha)
+        self.assertEqual(self.submit_project().status_code, 201)
+        ProjectSubmission.objects.update(status="changes_requested", feedback="Add a README")
+        again = self.submit_project("https://github.com/asha/project-v2")
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(again.json()["status"], "submitted")
+        self.assertEqual(again.json()["feedback"], "")
+        self.assertEqual(ProjectSubmission.objects.count(), 1)
+        ProjectSubmission.objects.update(status="approved")
+        self.assertEqual(self.submit_project().status_code, 400)
+
+    def test_student_cannot_approve_own_project(self):
+        self.login_as(self.asha)
+        response = self.client.post(
+            reverse("course-project", args=[self.course.id]),
+            {"repo_url": "https://github.com/a/b", "status": "approved"},
+            format="json",
+        )
+        self.assertEqual(response.json()["status"], "submitted")
+
+    # --- certificate rules ---
+    def test_no_certificate_until_everything_is_done(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        self.take_quiz(0)
+        self.assertIsNone(self.approve_project())  # no project submitted yet
+        self.assertEqual(Certificate.objects.count(), 0)
+
+    def test_failed_quiz_blocks_certificate(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        self.take_quiz(1)  # wrong
+        self.submit_project()
+        self.assertIsNone(self.approve_project())
+
+    def test_unapproved_project_blocks_certificate(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        self.take_quiz(0)
+        self.submit_project()
+        self.assertEqual(Certificate.objects.count(), 0)
+
+    def test_full_flow_issues_one_certificate(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        self.take_quiz(0)
+        self.submit_project()
+        certificate = self.approve_project()
+        self.assertIsNotNone(certificate)
+        self.assertTrue(certificate.certificate_number.startswith("SB-"))
+        self.assertEqual(certificate.recipient_name, "Asha Kumar")
+        # asking again must not create a second one
+        issue_certificate_if_eligible(self.asha, self.course)
+        self.assertEqual(Certificate.objects.count(), 1)
+        self.assertEqual(Enrollment.objects.get(user=self.asha).status, "completed")
+
+    def test_certificate_issued_when_last_step_is_the_lesson(self):
+        self.login_as(self.asha)
+        self.take_quiz(0)
+        self.submit_project()
+        ProjectSubmission.objects.update(status="approved")
+        response = self.finish_lesson()
+        self.assertIsNotNone(response.json()["certificate"])
+        self.assertEqual(Certificate.objects.count(), 1)
+
+    def test_progress_endpoint(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        data = self.client.get(reverse("course-progress", args=[self.course.id])).json()
+        self.assertEqual(data["lessons"], {"done": 1, "total": 1})
+        self.assertEqual(data["quizzes"], {"passed": 0, "total": 1})
+        self.assertFalse(data["eligible"])
+        self.assertIsNone(data["certificate"])
+
+    def test_my_certificates_lists_only_own(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        self.take_quiz(0)
+        self.submit_project()
+        self.approve_project()
+        self.assertEqual(len(self.client.get(reverse("my-certificates")).json()), 1)
+        self.login_as(self.outsider)
+        self.assertEqual(self.client.get(reverse("my-certificates")).json(), [])
+
+    # --- public verification ---
+    def test_public_verification_valid_invalid_and_revoked(self):
+        self.login_as(self.asha)
+        self.finish_lesson()
+        self.take_quiz(0)
+        self.submit_project()
+        certificate = self.approve_project()
+        self.client.credentials()  # logged out: anyone can verify
+
+        url = reverse("certificate-verify", args=[certificate.certificate_number.lower()])
+        ok = self.client.get(url)
+        self.assertEqual(ok.status_code, 200)
+        body = ok.json()
+        self.assertTrue(body["valid"])
+        self.assertEqual(body["recipient_name"], "Asha Kumar")
+        self.assertEqual(body["course_title"], "Python")
+        self.assertNotIn("asha@example.com", ok.content.decode())
+
+        missing = self.client.get(reverse("certificate-verify", args=["SB-AAAAA-BBBBB"]))
+        self.assertEqual(missing.status_code, 404)
+        self.assertFalse(missing.json()["valid"])
+
+        certificate.revoked = True
+        certificate.save()
+        revoked = self.client.get(url)
+        self.assertFalse(revoked.json()["valid"])

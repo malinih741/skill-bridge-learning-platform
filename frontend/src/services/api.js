@@ -68,3 +68,10 @@ export const getCourseLessons = (courseId) => request(`/courses/${courseId}/less
 export const completeLesson = (lessonId) => post(`/lessons/${lessonId}/complete/`);
 export const getCourseQuizzes = (courseId) => request(`/courses/${courseId}/quizzes/`);
 export const submitQuiz = (quizId, answers) => post(`/quizzes/${quizId}/submit/`, { answers });
+
+// Project + certificate
+export const getProgress = (courseId) => request(`/courses/${courseId}/progress/`);
+export const submitProject = (courseId, data) => post(`/courses/${courseId}/project/`, data);
+export const getMyCertificates = () => request("/my-certificates/");
+export const verifyCertificate = (number) =>
+  request(`/certificates/verify/${encodeURIComponent(number)}/`);

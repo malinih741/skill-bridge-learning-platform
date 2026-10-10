@@ -1,12 +1,28 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from .models import Course, Enrollment, Lesson, LessonProgress, Quiz, QuizAttempt
-from .serializers import CourseDetailSerializer, CourseListSerializer, MyCourseSerializer
+from .models import (
+    Certificate,
+    Course,
+    Enrollment,
+    Lesson,
+    LessonProgress,
+    ProjectSubmission,
+    Quiz,
+    QuizAttempt,
+)
+from .serializers import (
+    CourseDetailSerializer,
+    CourseListSerializer,
+    MyCourseSerializer,
+    ProjectSubmissionSerializer,
+)
+from .services import completion_status, issue_certificate_if_eligible
 
 
 def require_enrolment(user, course):
@@ -89,7 +105,15 @@ class CompleteLessonView(APIView):
         lesson = get_object_or_404(Lesson, pk=pk, course__published=True)
         require_enrolment(request.user, lesson.course)
         _, created = LessonProgress.objects.get_or_create(user=request.user, lesson=lesson)
-        return Response({"completed": True, "lesson": lesson.id}, status=201 if created else 200)
+        certificate = issue_certificate_if_eligible(request.user, lesson.course)
+        return Response(
+            {
+                "completed": True,
+                "lesson": lesson.id,
+                "certificate": certificate.certificate_number if certificate else None,
+            },
+            status=201 if created else 200,
+        )
 
 
 class CourseQuizzesView(APIView):
@@ -157,14 +181,124 @@ class SubmitQuizView(APIView):
         score = round(100 * correct / len(questions))
         passed = score >= quiz.pass_mark
         QuizAttempt.objects.create(user=request.user, quiz=quiz, score=score, passed=passed)
+        certificate = issue_certificate_if_eligible(request.user, quiz.course) if passed else None
 
         return Response(
             {
+                "certificate": certificate.certificate_number if certificate else None,
                 "score": score,
                 "passed": passed,
                 "pass_mark": quiz.pass_mark,
                 "correct": correct,
                 "total": len(questions),
                 "results": results,
+            }
+        )
+
+
+# ---------------------------------------------------------------- projects & certificates
+
+
+class CourseProgressView(APIView):
+    """GET /api/courses/<id>/progress/ - what is left before the certificate?"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        course = get_object_or_404(Course, pk=pk, published=True)
+        require_enrolment(request.user, course)
+        status = completion_status(request.user, course)
+        certificate = Certificate.objects.filter(
+            user=request.user, course=course, revoked=False
+        ).first()
+        submission = status["submission"]
+        return Response(
+            {
+                "lessons": status["lessons"],
+                "quizzes": status["quizzes"],
+                "project": ProjectSubmissionSerializer(submission).data if submission else None,
+                "eligible": status["eligible"],
+                "certificate": (
+                    {
+                        "number": certificate.certificate_number,
+                        "issued_at": certificate.issued_at,
+                    }
+                    if certificate
+                    else None
+                ),
+            }
+        )
+
+
+class SubmitProjectView(APIView):
+    """POST /api/courses/<id>/project/ - submit (or re-submit after changes were requested)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        course = get_object_or_404(Course, pk=pk, published=True)
+        require_enrolment(request.user, course)
+        existing = ProjectSubmission.objects.filter(user=request.user, course=course).first()
+        if existing and existing.status == ProjectSubmission.Status.APPROVED:
+            raise ValidationError({"detail": "Your project is already approved."})
+
+        serializer = ProjectSubmissionSerializer(existing, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        submission = serializer.save(
+            user=request.user,
+            course=course,
+            status=ProjectSubmission.Status.SUBMITTED,
+            feedback="",
+            reviewed_at=None,
+            reviewed_by=None,
+        )
+        return Response(
+            ProjectSubmissionSerializer(submission).data, status=201 if existing is None else 200
+        )
+
+
+class MyCertificatesView(APIView):
+    """GET /api/my-certificates/"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        certificates = Certificate.objects.filter(user=request.user, revoked=False).select_related("course")
+        return Response(
+            [
+                {
+                    "number": c.certificate_number,
+                    "course_title": c.course.title,
+                    "issued_at": c.issued_at,
+                }
+                for c in certificates
+            ]
+        )
+
+
+class VerifyCertificateView(APIView):
+    """GET /api/certificates/verify/<number>/ - public, no login. Shows no email or other private data."""
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify"
+
+    def get(self, request, number):
+        certificate = (
+            Certificate.objects.select_related("course")
+            .filter(certificate_number=number.strip().upper())
+            .first()
+        )
+        if certificate is None:
+            return Response(
+                {"valid": False, "detail": "No certificate was found with this number."}, status=404
+            )
+        if certificate.revoked:
+            return Response({"valid": False, "detail": "This certificate has been revoked."})
+        return Response(
+            {
+                "valid": True,
+                "certificate_number": certificate.certificate_number,
+                "recipient_name": certificate.recipient_name,
+                "course_title": certificate.course.title,
+                "level": certificate.course.level,
+                "issued_at": certificate.issued_at,
             }
         )

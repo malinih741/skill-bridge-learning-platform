@@ -84,4 +84,6 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    # Slows down password guessing and certificate-number guessing.
+    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "verify": "30/min"},
 }

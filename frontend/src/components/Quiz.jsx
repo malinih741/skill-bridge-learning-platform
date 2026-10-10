@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { submitQuiz } from "../services/api.js";
 
-export default function Quiz({ quiz }) {
+export default function Quiz({ quiz, onSubmitted }) {
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -15,6 +15,7 @@ export default function Quiz({ quiz }) {
     setError("");
     try {
       setResult(await submitQuiz(quiz.id, answers));
+      if (onSubmitted) onSubmitted();
     } catch (err) {
       setError(err.message);
     } finally {

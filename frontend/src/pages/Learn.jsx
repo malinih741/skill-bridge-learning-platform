@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import CompletionPanel from "../components/CompletionPanel.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 import Quiz from "../components/Quiz.jsx";
 import Status from "../components/Status.jsx";
 import useFetch from "../hooks/useFetch.js";
-import { completeLesson, getCourseLessons, getCourseQuizzes } from "../services/api.js";
+import { completeLesson, getCourseLessons, getCourseQuizzes, getProgress } from "../services/api.js";
 
 export default function Learn() {
   const { id } = useParams();
   const { data, loading, error } = useFetch(() => getCourseLessons(id), [id]);
   const quizzes = useFetch(() => getCourseQuizzes(id), [id]);
+  const [refresh, setRefresh] = useState(0);
+  const progress = useFetch(() => getProgress(id), [id, refresh]);
   const [done, setDone] = useState(new Set());
   const [activeId, setActiveId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+
+  const refreshProgress = () => setRefresh((n) => n + 1);
 
   useEffect(() => {
     if (!data) return;
@@ -31,7 +36,7 @@ export default function Learn() {
       </section>
     );
   }
-  if (loading || error) {
+  if (loading || error || !data) {
     return (
       <section className="container section">
         <Status loading={loading} error={error} />
@@ -51,6 +56,7 @@ export default function Learn() {
       await completeLesson(lesson.id);
       setDone(new Set(done).add(lesson.id));
       if (lessons[index + 1]) setActiveId(lessons[index + 1].id);
+      refreshProgress();
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -100,9 +106,13 @@ export default function Learn() {
       </div>
 
       <h2>Quizzes</h2>
-      <Status loading={quizzes.loading} error={quizzes.error} />
+      <Status loading={quizzes.loading && !quizzes.data} error={quizzes.error} />
       {quizzes.data && quizzes.data.length === 0 && <p className="empty">No quizzes for this course yet.</p>}
-      {quizzes.data && quizzes.data.map((q) => <Quiz key={q.id} quiz={q} />)}
+      {quizzes.data && quizzes.data.map((q) => <Quiz key={q.id} quiz={q} onSubmitted={refreshProgress} />)}
+
+      {progress.data && (
+        <CompletionPanel courseId={id} progress={progress.data} onChanged={refreshProgress} />
+      )}
     </section>
   );
 }

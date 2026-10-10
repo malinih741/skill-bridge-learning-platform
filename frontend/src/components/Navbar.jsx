@@ -30,6 +30,7 @@ export default function Navbar() {
         <nav className={`nav-links ${open ? "open" : ""}`}>
           <NavLink to="/" end onClick={close}>Home</NavLink>
           <NavLink to="/courses" onClick={close}>Courses</NavLink>
+          <NavLink to="/verify" onClick={close}>Verify certificate</NavLink>
           {user ? (
             <>
               <NavLink to="/dashboard" onClick={close}>My courses</NavLink>
