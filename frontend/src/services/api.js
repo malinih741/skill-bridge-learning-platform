@@ -62,3 +62,9 @@ export const register = (name, email, password) => post("/auth/register/", { nam
 export const login = (email, password) => post("/auth/login/", { email, password });
 export const logout = () => post("/auth/logout/");
 export const getMe = () => request("/auth/me/");
+
+// Learning
+export const getCourseLessons = (courseId) => request(`/courses/${courseId}/lessons/`);
+export const completeLesson = (lessonId) => post(`/lessons/${lessonId}/complete/`);
+export const getCourseQuizzes = (courseId) => request(`/courses/${courseId}/quizzes/`);
+export const submitQuiz = (quizId, answers) => post(`/quizzes/${quizId}/submit/`, { answers });

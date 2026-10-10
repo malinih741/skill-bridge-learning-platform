@@ -71,7 +71,7 @@ export default function CourseDetails() {
       {!user && <Link to="/login" className="btn">Log in to enrol</Link>}
       {user && isEnrolled && (
         <p className="success">
-          You're enrolled. <Link to="/dashboard">Go to My courses</Link>
+          You're enrolled. <Link to={`/courses/${id}/learn`}>Start learning</Link>
         </p>
       )}
       {user && !isEnrolled && (

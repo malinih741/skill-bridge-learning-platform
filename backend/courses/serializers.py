@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Course, Lesson
+from .models import Course, Lesson, LessonProgress
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -34,3 +34,15 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "id", "title", "description", "level", "weeks",
             "project", "outcomes", "lessons", "lesson_list", "is_enrolled",
         ]
+
+
+class MyCourseSerializer(CourseListSerializer):
+    """Course card + the logged-in student's progress."""
+    completed_lessons = serializers.SerializerMethodField()
+
+    class Meta(CourseListSerializer.Meta):
+        fields = CourseListSerializer.Meta.fields + ["completed_lessons"]
+
+    def get_completed_lessons(self, obj):
+        user = self.context["request"].user
+        return LessonProgress.objects.filter(user=user, lesson__course=obj).count()

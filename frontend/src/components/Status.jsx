@@ -1,6 +1,6 @@
 // Shared loading / error message.
 export default function Status({ loading, error }) {
-  if (loading) return <p className="status">Loading courses…</p>;
+  if (loading) return <p className="status">Loading…</p>;
   if (error) {
     return (
       <p className="status status-error" role="alert">

@@ -65,3 +65,71 @@ class Enrollment(models.Model):
 
     def __str__(self):
         return f"{self.user} -> {self.course}"
+
+
+class LessonProgress(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="lesson_progress", on_delete=models.CASCADE
+    )
+    lesson = models.ForeignKey(Lesson, related_name="progress", on_delete=models.CASCADE)
+    completed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "lesson"], name="unique_progress_per_user_lesson")
+        ]
+
+    def __str__(self):
+        return f"{self.user} completed {self.lesson}"
+
+
+class Quiz(models.Model):
+    course = models.ForeignKey(Course, related_name="quizzes", on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    pass_mark = models.PositiveSmallIntegerField(default=60, help_text="Percentage needed to pass")
+
+    class Meta:
+        verbose_name_plural = "quizzes"
+
+    def __str__(self):
+        return f"{self.course.title}: {self.title}"
+
+
+class Question(models.Model):
+    quiz = models.ForeignKey(Quiz, related_name="questions", on_delete=models.CASCADE)
+    question_text = models.CharField(max_length=300)
+    options = models.JSONField(default=list, help_text='List of choices, e.g. ["a", "b", "c"]')
+    correct_answer = models.PositiveSmallIntegerField(
+        help_text="Position of the right option, starting at 0 (first option = 0)"
+    )
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if not isinstance(self.options, list) or len(self.options) < 2:
+            raise ValidationError("Provide at least two options as a list.")
+        if self.correct_answer >= len(self.options):
+            raise ValidationError("correct_answer must be the position (from 0) of the right option.")
+
+    def __str__(self):
+        return self.question_text
+
+
+class QuizAttempt(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="quiz_attempts", on_delete=models.CASCADE
+    )
+    quiz = models.ForeignKey(Quiz, related_name="attempts", on_delete=models.CASCADE)
+    score = models.PositiveSmallIntegerField(help_text="Percentage, calculated by the server")
+    passed = models.BooleanField(default=False)
+    attempted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-attempted_at"]
+
+    def __str__(self):
+        return f"{self.user} - {self.quiz} - {self.score}%"
