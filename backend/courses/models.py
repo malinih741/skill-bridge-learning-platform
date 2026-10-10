@@ -43,3 +43,25 @@ class Lesson(models.Model):
 
     def __str__(self):
         return f"{self.course.title} - {self.sequence_number}. {self.title}"
+
+
+class Enrollment(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        COMPLETED = "completed", "Completed"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="enrollments", on_delete=models.CASCADE
+    )
+    course = models.ForeignKey(Course, related_name="enrollments", on_delete=models.CASCADE)
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+
+    class Meta:
+        ordering = ["-enrolled_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "course"], name="unique_enrollment_per_user_course")
+        ]
+
+    def __str__(self):
+        return f"{self.user} -> {self.course}"

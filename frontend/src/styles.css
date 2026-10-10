@@ -87,3 +87,9 @@ input { font: inherit; padding: .6rem .8rem; border: 1px solid var(--line); bord
 
 .status { padding: 1.2rem; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); }
 .status-error { border-color: #b3261e; color: #b3261e; }
+
+.nav-user { color: var(--signal); font-weight: 600; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.nav .btn-small { font-size: 1rem; }
+.success { padding: 1rem; background: #dff2e6; color: #1d6b3a; border-radius: var(--radius); font-weight: 600; }
+.success a { color: #1d6b3a; }

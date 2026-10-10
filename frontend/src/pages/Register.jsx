@@ -1,19 +1,30 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Register() {
+  const { register } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email) return setError("Enter your name and email.");
+    if (!form.name.trim() || !form.email.trim()) return setError("Enter your name and email.");
     if (form.password.length < 8) return setError("Password must be at least 8 characters.");
     setError("");
-    // Week 3: call POST /api/auth/register/
-    alert("Register API will be connected in Week 3.");
+    setBusy(true);
+    try {
+      await register(form.name.trim(), form.email.trim(), form.password);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -30,7 +41,7 @@ export default function Register() {
           <input type="password" name="password" value={form.password} onChange={onChange} autoComplete="new-password" />
         </label>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn" type="submit">Create account</button>
+        <button className="btn" type="submit" disabled={busy}>{busy ? "Creating account…" : "Create account"}</button>
       </form>
       <p>Already registered? <Link to="/login">Log in</Link></p>
     </section>

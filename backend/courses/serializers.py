@@ -20,10 +20,17 @@ class CourseListSerializer(serializers.ModelSerializer):
 class CourseDetailSerializer(serializers.ModelSerializer):
     lessons = serializers.IntegerField(source="lessons.count", read_only=True)
     lesson_list = LessonSerializer(source="lessons", many=True, read_only=True)
+    is_enrolled = serializers.SerializerMethodField()
+
+    def get_is_enrolled(self, obj):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        return obj.enrollments.filter(user=request.user).exists()
 
     class Meta:
         model = Course
         fields = [
             "id", "title", "description", "level", "weeks",
-            "project", "outcomes", "lessons", "lesson_list",
+            "project", "outcomes", "lessons", "lesson_list", "is_enrolled",
         ]

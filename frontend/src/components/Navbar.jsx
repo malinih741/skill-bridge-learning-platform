@@ -1,9 +1,18 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const close = () => setOpen(false);
+
+  const onLogout = async () => {
+    close();
+    await logout();
+    navigate("/");
+  };
 
   return (
     <header className="nav">
@@ -21,8 +30,18 @@ export default function Navbar() {
         <nav className={`nav-links ${open ? "open" : ""}`}>
           <NavLink to="/" end onClick={close}>Home</NavLink>
           <NavLink to="/courses" onClick={close}>Courses</NavLink>
-          <NavLink to="/login" onClick={close}>Log in</NavLink>
-          <Link to="/register" className="btn btn-small" onClick={close}>Create account</Link>
+          {user ? (
+            <>
+              <NavLink to="/dashboard" onClick={close}>My courses</NavLink>
+              <span className="nav-user">Hi, {user.name}</span>
+              <button className="btn btn-small" onClick={onLogout}>Log out</button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/login" onClick={close}>Log in</NavLink>
+              <Link to="/register" className="btn btn-small" onClick={close}>Create account</Link>
+            </>
+          )}
         </nav>
       </div>
     </header>

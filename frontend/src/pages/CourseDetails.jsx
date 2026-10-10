@@ -1,11 +1,35 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Status from "../components/Status.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import useFetch from "../hooks/useFetch.js";
-import { getCourse } from "../services/api.js";
+import { enroll, getCourse } from "../services/api.js";
 
 export default function CourseDetails() {
   const { id } = useParams();
-  const { data: course, loading, error } = useFetch(() => getCourse(id), [id]);
+  const { user } = useAuth();
+  const { data: course, loading, error } = useFetch(() => getCourse(id), [id, user?.id]);
+  const [justEnrolled, setJustEnrolled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [enrollError, setEnrollError] = useState("");
+
+  useEffect(() => {
+    setJustEnrolled(false);
+    setEnrollError("");
+  }, [id]);
+
+  const onEnroll = async () => {
+    setBusy(true);
+    setEnrollError("");
+    try {
+      await enroll(id);
+      setJustEnrolled(true);
+    } catch (err) {
+      setEnrollError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (error && error.status === 404) {
     return (
@@ -25,6 +49,8 @@ export default function CourseDetails() {
     );
   }
 
+  const isEnrolled = justEnrolled || course.is_enrolled;
+
   return (
     <section className="container section narrow">
       <span className={`badge badge-${course.level.toLowerCase()}`}>{course.level}</span>
@@ -42,8 +68,18 @@ export default function CourseDetails() {
         {course.lesson_list.map((l) => <li key={l.id}>{l.title}</li>)}
       </ol>
 
-      {/* Next: replace with real enrolment (POST /api/courses/{id}/enroll/) */}
-      <Link to="/login" className="btn">Log in to enrol</Link>
+      {!user && <Link to="/login" className="btn">Log in to enrol</Link>}
+      {user && isEnrolled && (
+        <p className="success">
+          You're enrolled. <Link to="/dashboard">Go to My courses</Link>
+        </p>
+      )}
+      {user && !isEnrolled && (
+        <button className="btn" onClick={onEnroll} disabled={busy}>
+          {busy ? "Enrolling…" : "Enrol in this course"}
+        </button>
+      )}
+      {enrollError && <p className="error" role="alert">{enrollError}</p>}
     </section>
   );
 }
