@@ -51,7 +51,7 @@ The rules live in one place (`backend/courses/services.py`) and are checked ever
 |---|---|
 | Frontend | React 18, Vite, React Router |
 | Backend | Django, Django REST Framework, token authentication |
-| Database | SQLite (development) |
+| Database | MySQL 8.4 (SQLite is used automatically if no database is configured) |
 | Testing | Django test framework (API tests) |
 
 ## Project structure
@@ -74,12 +74,32 @@ skillbridge/
 
 ## Run it on your computer
 
-You need **Node.js**, **Python 3.12 or newer** and **Git**.
+You need **Node.js**, **Python 3.12 or newer**, **MySQL 8.4 or newer** and **Git**.
 
-### 1. Backend
+### 1. Create the MySQL database
+
+In a MySQL prompt (`mysql -u root -p`), run these. Choose your own password:
+
+```sql
+CREATE DATABASE skillbridge CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'skillbridge_user'@'localhost' IDENTIFIED BY 'choose-a-strong-password';
+GRANT ALL PRIVILEGES ON skillbridge.* TO 'skillbridge_user'@'localhost';
+GRANT ALL PRIVILEGES ON test_skillbridge.* TO 'skillbridge_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+The last `GRANT` lets the test command create its own temporary test database.
+
+### 2. Backend
 
 ```bash
 cd backend
+copy .env.example .env         # Windows   (macOS / Linux: cp .env.example .env)
+```
+
+Open `backend/.env` and set `DB_PASSWORD` to the password you chose. This file is ignored by Git, so your password stays on your computer.
+
+```bash
 python -m venv venv
 venv\Scripts\activate          # Windows
 # source venv/bin/activate     # macOS / Linux
@@ -94,7 +114,7 @@ The API runs at http://127.0.0.1:8000/api/ and the admin panel at http://127.0.0
 
 `seed_courses` adds five sample courses with lessons and quizzes. It is safe to run more than once.
 
-### 2. Frontend (in a second terminal)
+### 3. Frontend (in a second terminal)
 
 ```bash
 cd frontend
@@ -104,16 +124,21 @@ npm run dev
 
 Open http://localhost:5173.
 
-### 3. Run the tests
+### 4. Run the tests
 
 ```bash
 cd backend
 python manage.py test
 ```
 
-### Optional settings
+### Settings (`backend/.env`)
 
-Copy `backend/.env.example` to `backend/.env` to change the secret key, debug mode or allowed origins. Without it, safe development defaults are used. Set a real `DJANGO_SECRET_KEY` and `DJANGO_DEBUG=False` before putting the site online.
+| Setting | Purpose |
+|---|---|
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | MySQL connection. Remove `DB_NAME` to use a local SQLite file instead. |
+| `DJANGO_SECRET_KEY` | Set a long random value before putting the site online. |
+| `DJANGO_DEBUG` | Set to `False` when the site is online. |
+| `CORS_ALLOWED_ORIGINS` | Addresses the React app runs on. |
 
 ## API overview
 
@@ -150,7 +175,6 @@ Copy `backend/.env.example` to `backend/.env` to change the secret key, debug mo
 ## Known limitations
 
 - Runs locally only. It is not deployed yet.
-- Uses SQLite. A move to MySQL is planned.
 - The login token is kept in the browser's local storage. A production version should use secure, HTTP-only cookies.
 - No email verification and no password reset yet.
 - Lesson text is starter content. Replace it in the admin panel.
@@ -162,11 +186,11 @@ Copy `backend/.env.example` to `backend/.env` to change the secret key, debug mo
 - [x] Course catalogue, accounts, enrolment
 - [x] Lessons, progress tracking, quizzes
 - [x] Project review and certificates with public verification
-- [ ] MySQL database
+- [x] MySQL database
 - [ ] Deployment
 - [ ] Password reset and email verification
 - [ ] Frontend tests
 
 ## Author
 
-Built by ** Built by Hema Malini** as a portfolio project.
+Built by **Hema Malini** as a portfolio project.
