@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -8,6 +9,8 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
+if not DEBUG and SECRET_KEY == "dev-only-insecure-key-change-me":
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY in .env before turning DJANGO_DEBUG off.")
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 INSTALLED_APPS = [
@@ -88,6 +91,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"  # `collectstatic` gathers the admin's CSS/JS here
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174").split(",")
@@ -100,3 +104,10 @@ REST_FRAMEWORK = {
     # Slows down password guessing and certificate-number guessing.
     "DEFAULT_THROTTLE_RATES": {"login": "10/min", "verify": "30/min"},
 }
+
+# Needed for the admin login when the site is served over https on a real domain.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
