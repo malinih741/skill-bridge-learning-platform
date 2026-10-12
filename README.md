@@ -6,6 +6,13 @@ Built as a portfolio project with **React** and **Django REST Framework**.
 
 ![Home page](docs/screenshots/home.png)
 
+## Live demo
+
+- **Website:** https://tangerine-starship-6fa4ba.netlify.app
+- **API:** https://hema1418.pythonanywhere.com/api/courses/
+
+Create your own student account to try it. The demo runs on free hosting, so it can be slow on the first visit, and it may be offline for a short while if the free plan is not renewed.
+
 ## Features
 
 **For students**
@@ -53,6 +60,7 @@ The rules live in one place (`backend/courses/services.py`) and are checked ever
 | Backend | Django, Django REST Framework, token authentication |
 | Database | MySQL 8.4 (SQLite is used automatically if no database is configured) |
 | Testing | Django test framework (API tests) |
+| Hosting | Netlify (frontend), PythonAnywhere free plan (backend) |
 
 ## Project structure
 
@@ -161,6 +169,28 @@ python manage.py test
 | GET | `/api/my-certificates/` | Student | My certificates |
 | GET | `/api/certificates/verify/<number>/` | Anyone | Verify a certificate |
 
+## Deployment
+
+| Part | Where | Notes |
+|---|---|---|
+| React app | Netlify | Built with `VITE_API_URL` pointing at the API, then uploaded. `public/_redirects` makes page refreshes work. |
+| Django API | PythonAnywhere (free plan) | Settings come from a server-side `.env` file with `DJANGO_DEBUG=False` and a generated secret key. |
+| Database | SQLite on the live site, MySQL on my computer | The same settings file picks the database from `.env`. |
+
+Live-site settings that matter (kept in `backend/.env` on the server, never in Git):
+
+- `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=False`, `DJANGO_ALLOWED_HOSTS`
+- `CORS_ALLOWED_ORIGINS`: the address of the React site
+- `CSRF_TRUSTED_ORIGINS`: the https address of the API, needed for the admin login
+
+Build the frontend for the live API:
+
+```bash
+cd frontend
+set VITE_API_URL=https://hema1418.pythonanywhere.com/api&& npm run build    # Windows
+# VITE_API_URL=https://hema1418.pythonanywhere.com/api npm run build        # macOS / Linux
+```
+
 ## Security and design decisions
 
 - **Passwords are hashed** by Django. They are never stored as plain text, and weak passwords are rejected.
@@ -174,7 +204,7 @@ python manage.py test
 
 ## Known limitations
 
-- Runs locally only. It is not deployed yet.
+- The live site uses free hosting. It needs a monthly renewal click on PythonAnywhere and uses SQLite there, not MySQL.
 - The login token is kept in the browser's local storage. A production version should use secure, HTTP-only cookies.
 - No email verification and no password reset yet.
 - Lesson text is starter content. Replace it in the admin panel.
@@ -187,10 +217,10 @@ python manage.py test
 - [x] Lessons, progress tracking, quizzes
 - [x] Project review and certificates with public verification
 - [x] MySQL database
-- [ ] Deployment
+- [x] Deployment
 - [ ] Password reset and email verification
 - [ ] Frontend tests
 
 ## Author
 
-Built by **Hema Malini** as a portfolio project.
+Built by **Hema Malini Saravanan** as a portfolio project.
